@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::config::SourceCfg;
 
-use super::util::{bar, f64_of, human_eta, human_rate, str_of, trunc};
+use super::util::{f64_of, human_eta, human_rate, pct_bar, str_of, trunc};
 use super::{action, cell, Panel, RowItem, Source, Tone};
 
 pub struct Qbit {
@@ -74,30 +74,34 @@ impl Qbit {
         Ok(resp.error_for_status()?)
     }
 
-    /// POST a form to `first`, falling back to `second` on 404 (v5 vs v4 API).
+    /// POST a form, re-logging-in once if the session cookie has expired.
+    async fn post(&mut self, path: &str, form: &[(&str, &str)]) -> Result<reqwest::Response> {
+        if !self.logged_in {
+            self.login().await?;
+        }
+        let url = format!("{}/api/v2/{path}", self.base);
+        let resp = self.client.post(&url).form(form).send().await?;
+        if resp.status() == reqwest::StatusCode::FORBIDDEN {
+            self.login().await?;
+            return Ok(self.client.post(&url).form(form).send().await?);
+        }
+        Ok(resp)
+    }
+
+    /// POST to `first`, falling back to `second` on 404 (v5 vs v4 API).
     async fn post_either(
         &mut self,
         first: &str,
         second: &str,
         form: &[(&str, &str)],
     ) -> Result<()> {
-        if !self.logged_in {
-            self.login().await?;
-        }
-        for (i, path) in [first, second].iter().enumerate() {
-            let resp = self
-                .client
-                .post(format!("{}/api/v2/{path}", self.base))
-                .form(form)
-                .send()
-                .await?;
-            if resp.status() == reqwest::StatusCode::NOT_FOUND && i == 0 {
-                continue;
-            }
-            resp.error_for_status()?;
+        let resp = self.post(first, form).await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND && first != second {
+            self.post(second, form).await?.error_for_status()?;
             return Ok(());
         }
-        anyhow::bail!("both endpoints missing: {first}, {second}")
+        resp.error_for_status()?;
+        Ok(())
     }
 }
 
@@ -145,7 +149,7 @@ impl Source for Qbit {
                 let mut cells = vec![
                     cell(icon, tone),
                     cell(trunc(&str_of(&t["name"]), 42), Tone::Default),
-                    cell(format!("{} {:.0}%", bar(prog, 8), prog * 100.0), Tone::Info),
+                    cell(pct_bar(prog, 8), Tone::Info),
                 ];
                 if dl > 0.0 {
                     cells.push(cell(human_rate(dl), Tone::Good));
@@ -175,7 +179,7 @@ impl Source for Qbit {
             footer: alt.then(|| "⚠ alternative speed limits are ON".into()),
             panel_actions: vec![
                 action("alt", "toggle alternative speed limits", false),
-                action("pause_all", "pause ALL torrents", true),
+                action("pause_all", "pause ALL torrents", false),
                 action("resume_all", "resume all torrents", false),
             ],
             ..Default::default()
@@ -195,12 +199,12 @@ impl Source for Qbit {
                 Ok("torrent resumed".into())
             }
             "delete" => {
-                self.post_either(
-                    "torrents/delete",
+                self.post(
                     "torrents/delete",
                     &[("hashes", row_key), ("deleteFiles", "false")],
                 )
-                .await?;
+                .await?
+                .error_for_status()?;
                 Ok("torrent deleted (files kept)".into())
             }
             "pause_all" => {
@@ -214,12 +218,9 @@ impl Source for Qbit {
                 Ok("all torrents resumed".into())
             }
             "alt" => {
-                self.post_either(
-                    "transfer/toggleSpeedLimitsMode",
-                    "transfer/toggleSpeedLimitsMode",
-                    &[],
-                )
-                .await?;
+                self.post("transfer/toggleSpeedLimitsMode", &[])
+                    .await?
+                    .error_for_status()?;
                 Ok("alternative speed limits toggled".into())
             }
             other => anyhow::bail!("unknown action {other}"),

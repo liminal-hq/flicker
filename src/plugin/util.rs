@@ -7,6 +7,21 @@
 
 use std::time::Duration;
 
+use unicode_width::UnicodeWidthChar;
+
+/// Mount prefixes no host panel wants to show (shared by glances + ssh).
+pub const SKIP_MOUNTS: &[&str] = &["/boot", "/snap", "/run", "/dev", "/var/lib/docker", "/efi"];
+
+/// Strip a secret from an error message before it reaches any output path.
+pub fn redact(err: impl std::fmt::Display, secret: &str) -> anyhow::Error {
+    let msg = err.to_string();
+    anyhow::anyhow!(if secret.is_empty() {
+        msg
+    } else {
+        msg.replace(secret, "•••")
+    })
+}
+
 pub fn client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(8))
@@ -50,6 +65,15 @@ pub fn human_eta(secs: i64) -> String {
     }
 }
 
+/// The standard progress cell: `███░░░░░ 62%`.
+pub fn pct_bar(ratio: f64, width: usize) -> String {
+    format!(
+        "{} {:.0}%",
+        bar(ratio, width),
+        ratio.clamp(0.0, 1.0) * 100.0
+    )
+}
+
 /// A little text progress bar: `███░░░░░░░`
 pub fn bar(ratio: f64, width: usize) -> String {
     let r = ratio.clamp(0.0, 1.0);
@@ -61,12 +85,21 @@ pub fn bar(ratio: f64, width: usize) -> String {
     )
 }
 
-/// Char-safe truncation with an ellipsis.
+/// Display-width-aware truncation with an ellipsis (CJK and emoji count 2).
 pub fn trunc(s: &str, max: usize) -> String {
-    if s.chars().count() <= max {
+    let width = |c: char| c.width().unwrap_or(0);
+    if s.chars().map(width).sum::<usize>() <= max {
         return s.to_string();
     }
-    let cut: String = s.chars().take(max.saturating_sub(1)).collect();
+    let mut used = 0;
+    let mut cut = String::new();
+    for c in s.chars() {
+        if used + width(c) > max.saturating_sub(1) {
+            break;
+        }
+        used += width(c);
+        cut.push(c);
+    }
     format!("{cut}…")
 }
 
@@ -108,6 +141,19 @@ mod tests {
     }
 
     #[test]
+    fn pct_bar_pairs_bar_and_percent() {
+        assert_eq!(pct_bar(0.5, 4), "██░░ 50%");
+        assert_eq!(pct_bar(2.0, 4), "████ 100%");
+    }
+
+    #[test]
+    fn redact_scrubs_the_secret() {
+        let e = redact("http://x/api?apikey=SECRET failed", "SECRET");
+        assert!(!e.to_string().contains("SECRET"));
+        assert!(e.to_string().contains("•••"));
+    }
+
+    #[test]
     fn bar_clamps_and_fills() {
         assert_eq!(bar(0.0, 4), "░░░░");
         assert_eq!(bar(0.5, 4), "██░░");
@@ -120,8 +166,10 @@ mod tests {
     fn trunc_is_char_safe() {
         assert_eq!(trunc("changeover", 20), "changeover");
         assert_eq!(trunc("the space between frames", 10), "the space…");
-        // multi-byte chars must not split
-        assert_eq!(trunc("🎬🎬🎬🎬", 3), "🎬🎬…");
+        // multi-byte chars must not split, and wide glyphs count 2 columns
+        assert_eq!(trunc("🎬🎬🎬🎬", 3), "🎬…");
+        assert_eq!(trunc("日本語のタイトル", 6), "日本…");
+        assert_eq!(trunc("🎬🎬", 4), "🎬🎬");
     }
 
     #[test]

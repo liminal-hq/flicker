@@ -18,8 +18,10 @@ pub struct Overseerr {
     base: String,
     key: String,
     client: reqwest::Client,
-    /// tmdbId → title cache so we don't re-look-up every poll.
-    titles: HashMap<i64, String>,
+    /// (mediaType, tmdbId) → title cache so we don't re-look-up every poll.
+    /// Movie and TV ids share a number space, so the type is part of the key,
+    /// and failures are never cached (a transient error should heal itself).
+    titles: HashMap<(String, i64), String>,
 }
 
 impl Overseerr {
@@ -43,28 +45,17 @@ impl Overseerr {
         Ok(resp.json().await?)
     }
 
-    async fn title_for(&mut self, media_type: &str, tmdb: i64) -> String {
-        if let Some(t) = self.titles.get(&tmdb) {
-            return t.clone();
-        }
+    /// One title lookup; Ok(None) when the response has no usable title.
+    async fn fetch_title(&self, media_type: &str, tmdb: i64) -> Option<String> {
         let path = if media_type == "movie" {
             format!("movie/{tmdb}")
         } else {
             format!("tv/{tmdb}")
         };
-        let title = match self.get(&path).await {
-            Ok(v) => {
-                let t = str_of(&v["title"]);
-                if t.is_empty() {
-                    str_of(&v["name"])
-                } else {
-                    t
-                }
-            }
-            Err(_) => format!("tmdb:{tmdb}"),
-        };
-        self.titles.insert(tmdb, title.clone());
-        title
+        let v = self.get(&path).await.ok()?;
+        let t = str_of(&v["title"]);
+        let t = if t.is_empty() { str_of(&v["name"]) } else { t };
+        (!t.is_empty()).then_some(t)
     }
 }
 
@@ -75,11 +66,35 @@ impl Source for Overseerr {
         let pending = f64_of(&v["pageInfo"]["results"]) as usize;
         let results = v["results"].as_array().cloned().unwrap_or_default();
 
+        // Resolve uncached titles concurrently, then fill the cache; failed
+        // lookups fall back to a placeholder without being cached.
+        let wanted: Vec<(String, i64)> = results
+            .iter()
+            .map(|r| {
+                (
+                    str_of(&r["media"]["mediaType"]),
+                    f64_of(&r["media"]["tmdbId"]) as i64,
+                )
+            })
+            .filter(|k| !self.titles.contains_key(k))
+            .collect();
+        let fetched =
+            futures::future::join_all(wanted.iter().map(|(t, id)| self.fetch_title(t, *id))).await;
+        for (key, title) in wanted.into_iter().zip(fetched) {
+            if let Some(title) = title {
+                self.titles.insert(key, title);
+            }
+        }
+
         let mut rows = Vec::new();
         for r in &results {
             let media_type = str_of(&r["media"]["mediaType"]);
             let tmdb = f64_of(&r["media"]["tmdbId"]) as i64;
-            let title = self.title_for(&media_type, tmdb).await;
+            let title = self
+                .titles
+                .get(&(media_type.clone(), tmdb))
+                .cloned()
+                .unwrap_or_else(|| format!("tmdb:{tmdb}"));
             let icon = if media_type == "movie" {
                 "🎬"
             } else {

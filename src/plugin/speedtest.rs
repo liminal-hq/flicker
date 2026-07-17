@@ -51,7 +51,8 @@ impl Source for Speedtest {
             .json()
             .await?;
         let data = &v["data"];
-        let failed = f64_of(&data["failed"]) > 0.0;
+        let failed =
+            data["failed"] == serde_json::Value::Bool(true) || f64_of(&data["failed"]) > 0.0;
 
         let mut rows = vec![result_row(
             "latest",

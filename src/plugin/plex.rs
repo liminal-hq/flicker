@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use crate::config::SourceCfg;
 
-use super::util::{bar, f64_of, str_of, trunc};
+use super::util::{f64_of, pct_bar, str_of, trunc};
 use super::{action, cell, Panel, RowItem, Source, Tone};
 
 pub struct Plex {
@@ -29,13 +29,19 @@ impl Plex {
 
     async fn get_raw(&self, path: &str, extra: &str) -> Result<reqwest::Response> {
         let url = format!("{}{path}?X-Plex-Token={}{extra}", self.base, self.token);
-        Ok(self
-            .client
-            .get(&url)
-            .header("Accept", "application/json")
-            .send()
-            .await?
-            .error_for_status()?)
+        // The token rides in the URL, so scrub it from any error we surface.
+        async {
+            anyhow::Ok(
+                self.client
+                    .get(&url)
+                    .header("Accept", "application/json")
+                    .send()
+                    .await?
+                    .error_for_status()?,
+            )
+        }
+        .await
+        .map_err(|e| super::util::redact(e, &self.token))
     }
 
     async fn get(&self, path: &str, extra: &str) -> Result<Value> {
@@ -81,10 +87,7 @@ impl Source for Plex {
                         cell(icon, itone),
                         cell(str_of(&s["User"]["title"]), Tone::Accent2),
                         cell(trunc(&title, 46), Tone::Default),
-                        cell(
-                            format!("{} {:.0}%", bar(prog, 10), prog * 100.0),
-                            Tone::Info,
-                        ),
+                        cell(pct_bar(prog, 10), Tone::Info),
                         cell(
                             if transcoding {
                                 "transcode"

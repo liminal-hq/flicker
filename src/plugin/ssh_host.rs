@@ -9,7 +9,7 @@ use tokio::process::Command;
 
 use crate::config::SourceCfg;
 
-use super::util::{human_bytes, trunc};
+use super::util::{human_bytes, trunc, SKIP_MOUNTS};
 use super::{action, cell, GaugeItem, Panel, RowItem, Source, Tone};
 
 pub struct SshHost {
@@ -72,8 +72,6 @@ fn section<'a>(raw: &'a str, name: &str) -> Vec<&'a str> {
     }
     lines
 }
-
-const SKIP_MOUNTS: &[&str] = &["/boot", "/snap", "/run", "/dev", "/var/lib/docker", "/efi"];
 
 #[async_trait]
 impl Source for SshHost {

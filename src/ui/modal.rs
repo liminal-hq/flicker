@@ -115,10 +115,9 @@ pub fn draw_palette(f: &mut Frame, app: &App, input: &str, sel: usize) {
     let list_items: Vec<ListItem> = items
         .iter()
         .map(|i| {
-            let danger = i.label.contains('⚠');
             ListItem::new(Span::styled(
                 i.label.clone(),
-                Style::default().fg(if danger { BAD } else { Color::Reset }),
+                Style::default().fg(if i.danger { BAD } else { Color::Reset }),
             ))
         })
         .collect();

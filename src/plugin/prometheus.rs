@@ -87,8 +87,10 @@ impl Source for Prometheus {
             })
             .collect();
 
-        for (label, expr) in &self.queries {
-            let cells = match self.query(expr).await {
+        let results =
+            futures::future::join_all(self.queries.iter().map(|(_, expr)| self.query(expr))).await;
+        for ((label, _), result) in self.queries.iter().zip(results) {
+            let cells = match result {
                 Ok(samples) => match samples.first() {
                     Some(s) => vec![
                         cell("·", Tone::Info),

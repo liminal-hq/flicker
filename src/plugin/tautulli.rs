@@ -13,7 +13,7 @@ use serde_json::Value;
 
 use crate::config::SourceCfg;
 
-use super::util::{bar, f64_of, str_of, trunc};
+use super::util::{f64_of, pct_bar, str_of, trunc};
 use super::{action, cell, Panel, RowItem, Source, Tone};
 
 pub struct Tautulli {
@@ -36,7 +36,10 @@ impl Tautulli {
 
     async fn cmd(&self, cmd: &str, extra: &str) -> Result<Value> {
         let url = format!("{}/api/v2?apikey={}&cmd={cmd}{extra}", self.base, self.key);
-        let v: Value = self.client.get(&url).send().await?.json().await?;
+        // The key rides in the URL, so scrub it from any error we surface.
+        let v: Value = async { anyhow::Ok(self.client.get(&url).send().await?.json().await?) }
+            .await
+            .map_err(|e| super::util::redact(e, &self.key))?;
         anyhow::ensure!(
             v["response"]["result"] == "success",
             "tautulli: {}",
@@ -91,10 +94,7 @@ impl Source for Tautulli {
                         cell(icon, itone),
                         cell(str_of(&s["user"]), Tone::Accent2),
                         cell(trunc(&title, 46), Tone::Default),
-                        cell(
-                            format!("{} {:.0}%", bar(prog, 10), prog * 100.0),
-                            Tone::Info,
-                        ),
+                        cell(pct_bar(prog, 10), Tone::Info),
                         cell(decision, dtone),
                         cell(format!("{mbps:.1} Mbps"), Tone::Muted),
                         cell(trunc(&str_of(&s["player"]), 18), Tone::Muted),

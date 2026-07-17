@@ -64,6 +64,7 @@ pub enum PalCmd {
 
 pub struct PaletteItem {
     pub label: String,
+    pub danger: bool,
     pub cmd: PalCmd,
 }
 
@@ -118,9 +119,11 @@ impl App {
             ok,
             at: Instant::now(),
         });
-        if ok {
-            self.last_action_ok = Some(Instant::now());
-        }
+    }
+
+    /// A real action succeeded — Jax may now party.
+    fn celebrate(&mut self) {
+        self.last_action_ok = Some(Instant::now());
     }
 
     pub fn status_line(&self) -> Option<(&str, bool)> {
@@ -159,7 +162,10 @@ impl App {
                     .map(|s| s.name.clone())
                     .unwrap_or_default();
                 match result {
-                    Ok(msg) => self.set_status(format!("{name}: {msg}"), true),
+                    Ok(msg) => {
+                        self.set_status(format!("{name}: {msg}"), true);
+                        self.celebrate();
+                    }
                     Err(e) => self.set_status(format!("{name}: {e}"), false),
                 }
             }
@@ -182,7 +188,10 @@ impl App {
                 });
                 self.set_status(format!("{name}: {}…", action.label), true);
             }
-            None => self.set_status(format!("demo: pretended to {} ✓", action.label), true),
+            None => {
+                self.set_status(format!("demo: pretended to {} ✓", action.label), true);
+                self.celebrate();
+            }
         }
     }
 
@@ -225,23 +234,28 @@ impl App {
         for (i, name) in self.screens.iter().enumerate() {
             all.push(PaletteItem {
                 label: format!("go to {name}"),
+                danger: false,
                 cmd: PalCmd::Screen(i),
             });
         }
         all.push(PaletteItem {
             label: "refresh everything".into(),
+            danger: false,
             cmd: PalCmd::RefreshAll,
         });
         all.push(PaletteItem {
             label: "toggle Jax".into(),
+            danger: false,
             cmd: PalCmd::ToggleJax,
         });
         all.push(PaletteItem {
             label: "help".into(),
+            danger: false,
             cmd: PalCmd::Help,
         });
         all.push(PaletteItem {
             label: "quit flicker".into(),
+            danger: false,
             cmd: PalCmd::Quit,
         });
         if let Some(slot) = self.focused_slot() {
@@ -249,6 +263,7 @@ impl App {
             for (a, key) in self.slot_actions(slot) {
                 all.push(PaletteItem {
                     label: format!("{name}: {}{}", a.label, if a.danger { " ⚠" } else { "" }),
+                    danger: a.danger,
                     cmd: PalCmd::Slot {
                         slot,
                         action: a,
@@ -336,8 +351,9 @@ impl App {
                 row_key,
                 context,
             } => match key.code {
-                KeyCode::Char('y') | KeyCode::Enter => self.dispatch(slot, action, row_key),
-                KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('q') => {
+                // Only an explicit 'y' fires; Enter takes the default (No).
+                KeyCode::Char('y') => self.dispatch(slot, action, row_key),
+                KeyCode::Esc | KeyCode::Enter | KeyCode::Char('n') | KeyCode::Char('q') => {
                     self.set_status("cancelled — nothing touched", true);
                 }
                 _ => {
@@ -559,6 +575,25 @@ mod tests {
         let (msg, ok) = app.status_line().expect("cancel sets a status");
         assert!(ok);
         assert!(msg.contains("cancelled"));
+    }
+
+    #[test]
+    fn enter_takes_the_default_no_in_confirm() {
+        let mut app = demo_app();
+        app.on_key(key(KeyCode::Enter)); // open menu
+        app.on_key(key(KeyCode::Enter)); // choose danger action -> Confirm
+        assert!(matches!(app.overlay, Overlay::Confirm { .. }));
+        app.on_key(key(KeyCode::Enter)); // Enter = default No
+        assert!(matches!(app.overlay, Overlay::None));
+        let (msg, _) = app.status_line().expect("cancel sets a status");
+        assert!(msg.contains("cancelled"), "Enter must cancel, got: {msg}");
+    }
+
+    #[test]
+    fn refresh_does_not_start_a_party() {
+        let mut app = demo_app();
+        app.on_key(key(KeyCode::Char('r')));
+        assert!(app.last_action_ok.is_none(), "refresh must not celebrate");
     }
 
     #[test]

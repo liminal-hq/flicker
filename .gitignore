@@ -3,3 +3,4 @@
 .DS_Store
 # never commit a real config — it holds API keys
 config.local.toml
+*.rs.tmp

@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use crate::config::SourceCfg;
 
-use super::util::{f64_of, human_bytes, str_of};
+use super::util::{f64_of, human_bytes, str_of, SKIP_MOUNTS};
 use super::{GaugeItem, Panel, Source};
 
 pub struct Glances {
@@ -35,8 +35,6 @@ impl Glances {
         Ok(resp.json().await?)
     }
 }
-
-const SKIP_MOUNTS: &[&str] = &["/boot", "/snap", "/run", "/dev", "/var/lib/docker"];
 
 #[async_trait]
 impl Source for Glances {

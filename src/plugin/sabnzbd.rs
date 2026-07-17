@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use crate::config::SourceCfg;
 
-use super::util::{bar, f64_of, str_of, trunc};
+use super::util::{f64_of, pct_bar, str_of, trunc};
 use super::{action, cell, Panel, RowItem, Source, Tone};
 
 pub struct Sabnzbd {
@@ -29,14 +29,20 @@ impl Sabnzbd {
 
     async fn api(&self, args: &str) -> Result<Value> {
         let url = format!("{}/api?output=json&apikey={}&{args}", self.base, self.key);
-        let v: Value = self
-            .client
-            .get(&url)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
+        // The key rides in the URL, so scrub it from any error we surface.
+        let v: Value = async {
+            anyhow::Ok(
+                self.client
+                    .get(&url)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json()
+                    .await?,
+            )
+        }
+        .await
+        .map_err(|e| super::util::redact(e, &self.key))?;
         if v["status"] == false {
             anyhow::bail!("sabnzbd: {}", str_of(&v["error"]));
         }
@@ -71,7 +77,7 @@ impl Source for Sabnzbd {
                     key: str_of(&s["nzo_id"]),
                     cells: vec![
                         cell(trunc(&str_of(&s["filename"]), 42), Tone::Default),
-                        cell(format!("{} {:.0}%", bar(prog, 8), prog * 100.0), Tone::Info),
+                        cell(pct_bar(prog, 8), Tone::Info),
                         cell(status.to_lowercase(), tone),
                         cell(str_of(&s["timeleft"]), Tone::Muted),
                     ],
@@ -101,7 +107,7 @@ impl Source for Sabnzbd {
             )),
             rows,
             panel_actions: vec![
-                action("pause_all", "pause the whole queue", true),
+                action("pause_all", "pause the whole queue", false),
                 action("resume_all", "resume the queue", false),
             ],
             ..Default::default()

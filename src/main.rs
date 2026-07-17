@@ -151,18 +151,26 @@ async fn main() -> Result<()> {
             screens.push(screen.name.clone());
             for scfg in &screen.sources {
                 let id = slots.len();
-                let src = registry::build(scfg)?;
-                let interval = Duration::from_secs(scfg.interval_secs.unwrap_or(default_interval));
-                let cmd = spawn_worker(id, src, interval, tx.clone());
+                // A bad source becomes an error panel, not a refusal to start —
+                // the reels keep turning either way. Intervals floor at 2s so a
+                // config typo can't busy-poll a service.
+                let (cmd, error) = match registry::build(scfg) {
+                    Ok(src) => {
+                        let secs = scfg.interval_secs.unwrap_or(default_interval).max(2);
+                        let interval = Duration::from_secs(secs);
+                        (Some(spawn_worker(id, src, interval, tx.clone())), None)
+                    }
+                    Err(e) => (None, Some(e.to_string())),
+                };
                 slots.push(Slot {
                     name: scfg.display_name(),
                     kind: scfg.kind.clone(),
                     screen: si,
                     panel: None,
-                    error: None,
+                    error,
                     updated: None,
                     selected: 0,
-                    cmd: Some(cmd),
+                    cmd,
                 });
             }
         }
@@ -198,10 +206,15 @@ async fn run(
         terminal.draw(|f| ui::draw(f, app))?;
         tokio::select! {
             maybe = events.next() => {
-                if let Some(Ok(Event::Key(key))) = maybe {
-                    if key.kind != KeyEventKind::Release {
-                        app.on_key(key);
+                match maybe {
+                    Some(Ok(Event::Key(key))) => {
+                        if key.kind != KeyEventKind::Release {
+                            app.on_key(key);
+                        }
                     }
+                    // Input stream ended (stdin EOF): leave rather than spin.
+                    None => app.quit = true,
+                    _ => {}
                 }
             }
             Some(ev) = rx.recv() => {

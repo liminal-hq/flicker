@@ -3,7 +3,7 @@
 // (c) Copyright 2026 Liminal HQ, Scott Morris
 // SPDX-License-Identifier: MIT
 
-use super::util::bar;
+use super::util::pct_bar;
 use super::{action, cell, GaugeItem, Panel, RowItem, Tone};
 
 pub struct DemoSlot {
@@ -47,6 +47,11 @@ pub fn screens() -> Vec<(String, Vec<DemoSlot>)> {
                     kind: "radarr",
                     name: "radarr",
                     panel: radarr(),
+                },
+                DemoSlot {
+                    kind: "lidarr",
+                    name: "lidarr",
+                    panel: lidarr(),
                 },
                 DemoSlot {
                     kind: "prowlarr",
@@ -130,7 +135,7 @@ fn stream(user: &str, title: &str, pct: f64, decision: &str, mbps: f64, player: 
             cell("▶", Tone::Good),
             cell(user, Tone::Accent2),
             cell(title, Tone::Default),
-            cell(format!("{} {:.0}%", bar(pct, 10), pct * 100.0), Tone::Info),
+            cell(pct_bar(pct, 10), Tone::Info),
             cell(decision, dtone),
             cell(format!("{mbps:.1} Mbps"), Tone::Muted),
             cell(player, Tone::Muted),
@@ -183,7 +188,7 @@ fn queue_row(title: &str, pct: f64, status: &str, tone: Tone, left: &str) -> Row
         key: title.into(),
         cells: vec![
             cell(title, Tone::Default),
-            cell(format!("{} {:.0}%", bar(pct, 8), pct * 100.0), Tone::Info),
+            cell(pct_bar(pct, 8), Tone::Info),
             cell(status, tone),
             cell(left, Tone::Muted),
         ],
@@ -218,6 +223,21 @@ fn radarr() -> Panel {
             ),
             queue_row("The Last Reel (1962)", 0.98, "import", Tone::Warn, "80 MB"),
         ],
+        panel_actions: vec![action("rss", "trigger RSS sync", false)],
+        ..Default::default()
+    }
+}
+
+fn lidarr() -> Panel {
+    Panel {
+        badge: Some("1 queued".into()),
+        rows: vec![queue_row(
+            "The Sprockets — Between Frames LP",
+            0.48,
+            "downloading",
+            Tone::Good,
+            "22m",
+        )],
         panel_actions: vec![action("rss", "trigger RSS sync", false)],
         ..Default::default()
     }
@@ -278,7 +298,7 @@ fn qbit() -> Panel {
         let mut cells = vec![
             cell(icon, tone),
             cell(name, Tone::Default),
-            cell(format!("{} {:.0}%", bar(pct, 8), pct * 100.0), Tone::Info),
+            cell(pct_bar(pct, 8), Tone::Info),
         ];
         for (t2, tn) in extra {
             cells.push(cell(t2, tn));
@@ -333,7 +353,7 @@ fn qbit() -> Panel {
         ],
         panel_actions: vec![
             action("alt", "toggle alternative speed limits", false),
-            action("pause_all", "pause ALL torrents", true),
+            action("pause_all", "pause ALL torrents", false),
             action("resume_all", "resume all torrents", false),
         ],
         ..Default::default()
@@ -361,7 +381,7 @@ fn nzbget() -> Panel {
         ],
         footer: Some("341 GB this month".into()),
         panel_actions: vec![
-            action("pause_all", "pause the whole queue", true),
+            action("pause_all", "pause the whole queue", false),
             action("resume_all", "resume the queue", false),
         ],
         ..Default::default()
@@ -498,7 +518,7 @@ fn sabnzbd() -> Panel {
         ],
         footer: Some("337 GB free on download disk".into()),
         panel_actions: vec![
-            action("pause_all", "pause the whole queue", true),
+            action("pause_all", "pause the whole queue", false),
             action("resume_all", "resume the queue", false),
         ],
         ..Default::default()
@@ -596,6 +616,17 @@ mod tests {
         for (name, slots) in &screens {
             assert!(!name.is_empty());
             assert!(!slots.is_empty(), "screen {name} is an empty theatre");
+        }
+    }
+
+    #[test]
+    fn every_registered_kind_has_a_demo_panel() {
+        let have: Vec<&str> = screens()
+            .iter()
+            .flat_map(|(_, slots)| slots.iter().map(|s| s.kind))
+            .collect();
+        for kind in crate::plugin::registry::KINDS {
+            assert!(have.contains(kind), "kind {kind} has no demo panel");
         }
     }
 

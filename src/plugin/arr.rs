@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 
 use crate::config::SourceCfg;
 
-use super::util::{bar, f64_of, human_bytes, str_of, trunc};
+use super::util::{f64_of, human_bytes, pct_bar, str_of, trunc};
 use super::{action, cell, Panel, RowItem, Source, Tone};
 
 pub struct Arr {
@@ -113,9 +113,10 @@ impl Arr {
             "lidarr" => "&includeArtist=true&includeAlbum=true",
             _ => "",
         };
-        let q = self.get(&format!("queue?pageSize=12{include}")).await?;
+        let queue_path = format!("queue?pageSize=12{include}");
+        let (q, health) = tokio::join!(self.get(&queue_path), self.health_count());
+        let q = q?;
         let total = f64_of(&q["totalRecords"]) as usize;
-        let health = self.health_count().await;
 
         let rows = q["records"]
             .as_array()
@@ -144,7 +145,7 @@ impl Arr {
                     key: f64_of(&r["id"]).to_string(),
                     cells: vec![
                         cell(trunc(&self.record_title(r), 38), Tone::Default),
-                        cell(format!("{} {:.0}%", bar(prog, 8), prog * 100.0), Tone::Info),
+                        cell(pct_bar(prog, 8), Tone::Info),
                         cell(stxt, stone),
                         cell(
                             if timeleft.is_empty() {
@@ -184,8 +185,8 @@ impl Arr {
     }
 
     async fn poll_prowlarr(&self) -> Result<Panel> {
-        let idx = self.get("indexer").await?;
-        let health = self.health_count().await;
+        let (idx, health) = tokio::join!(self.get("indexer"), self.health_count());
+        let idx = idx?;
         let list = idx.as_array().cloned().unwrap_or_default();
         let enabled = list.iter().filter(|i| i["enable"] == true).count();
         let rows = list

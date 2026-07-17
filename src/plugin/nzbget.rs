@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 use crate::config::SourceCfg;
 
-use super::util::{bar, f64_of, human_bytes, human_rate, str_of, trunc};
+use super::util::{f64_of, human_bytes, human_rate, pct_bar, str_of, trunc};
 use super::{action, cell, Panel, RowItem, Source, Tone};
 
 pub struct Nzbget {
@@ -78,7 +78,7 @@ impl Source for Nzbget {
                     key: f64_of(&g["NZBID"]).to_string(),
                     cells: vec![
                         cell(trunc(&str_of(&g["NZBName"]), 44), Tone::Default),
-                        cell(format!("{} {:.0}%", bar(prog, 8), prog * 100.0), Tone::Info),
+                        cell(pct_bar(prog, 8), Tone::Info),
                         cell(gstatus.to_lowercase(), tone),
                         cell(human_bytes(left * 1024.0 * 1024.0), Tone::Muted),
                     ],
@@ -110,7 +110,7 @@ impl Source for Nzbget {
             )),
             rows,
             panel_actions: vec![
-                action("pause_all", "pause the whole queue", true),
+                action("pause_all", "pause the whole queue", false),
                 action("resume_all", "resume the queue", false),
             ],
             ..Default::default()

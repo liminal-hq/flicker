@@ -59,7 +59,7 @@ pub fn mood(app: &App) -> Mood {
 /// The ambient companion, bottom-left, exactly where he lived in jira-tui —
 /// only now he's watching the same panels you are.
 pub fn draw_companion(f: &mut Frame, app: &App, area: Rect) {
-    let w = 30u16.min(area.width);
+    let w = 30u16.min(area.width.saturating_sub(2));
     let h = 8u16.min(area.height.saturating_sub(1));
     if w < 16 || h < 6 {
         return;

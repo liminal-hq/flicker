@@ -53,9 +53,9 @@ Everything is async (tokio + reqwest); each source instance is owned by one toki
 | `plex` | sessions straight from Plex itself (no Tautulli required) | terminate session ⚠ |
 | `sonarr` / `radarr` / `lidarr` | download queue with progress + health warnings | RSS sync, remove queue item ⚠ |
 | `prowlarr` | indexer inventory + health | test all indexers |
-| `qbittorrent` | transfer rates, torrents with state/progress/ETA | pause/resume torrent, toggle alt speed |
+| `qbittorrent` | transfer rates, torrents with state/progress/ETA | pause/resume, toggle alt speed, delete torrent ⚠ |
 | `nzbget` | rate, remaining, queue groups | pause/resume queue |
-| `sabnzbd` | rate, remaining, queue slots, download-disk space | pause/resume queue ⚠, per-slot pause/resume/delete ⚠ |
+| `sabnzbd` | rate, remaining, queue slots, download-disk space | pause/resume, delete slot ⚠ |
 | `overseerr` | pending requests with requester + resolved titles | approve, decline ⚠ |
 | `glances` | CPU/mem/swap gauges + filesystems from Glances v4 API | — |
 | `ssh` | load, memory, disks, `docker ps` over plain ssh (BatchMode) | restart/stop container ⚠ |
@@ -64,7 +64,7 @@ Everything is async (tokio + reqwest); each source instance is owned by one toki
 | `speedtest` | latest + average results from speedtest-tracker | run a test now |
 | `jax` | Jax 2.0's shift log (the mascot is a plugin too — the UI animates his panel; the source ships only data) | pet Jax, toss him a snack |
 
-⚠ = destructive: always behind the confirm modal (curtain-red border, default No).
+⚠ = destructive: always behind the confirm modal (curtain-red border; only an explicit `y` fires — Enter and Esc take the default No). The policy line: pause/resume is reversible and never confirms; anything that deletes, removes, terminates, stops, or restarts always does.
 
 Deliberately absent: Grafana iframes (a terminal is not an iframe; the numbers come from Prometheus, the horse's mouth) and Ombi (its API key on the reference lab is dead and Overseerr already covers the job — easy to add later if anyone still runs it).
 
