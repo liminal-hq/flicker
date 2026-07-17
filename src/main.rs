@@ -207,10 +207,8 @@ async fn run(
         tokio::select! {
             maybe = events.next() => {
                 match maybe {
-                    Some(Ok(Event::Key(key))) => {
-                        if key.kind != KeyEventKind::Release {
-                            app.on_key(key);
-                        }
+                    Some(Ok(Event::Key(key))) if key.kind != KeyEventKind::Release => {
+                        app.on_key(key)
                     }
                     // Input stream ended (stdin EOF): leave rather than spin.
                     None => app.quit = true,
