@@ -27,13 +27,14 @@ Screens are rooms; the config names them and decides what hangs in each. The def
 |---|---|
 | **NOW SHOWING** | who's watching what, right now — per-stream progress, transcode verdicts, a bandwidth sparkline |
 | **COMING SOON** | Overseerr requests awaiting a thumbs-up, and the *arr queues fetching the future |
-| **FREIGHT** | qBittorrent and NZBGet — the trucks |
+| **FREIGHT** | qBittorrent, NZBGet, SABnzbd — the trucks |
+| **SIGNALS** | Prometheus target health, Uptime Kuma monitors, speedtest results |
 | **BACK LOT** | the machines themselves: Glances gauges, disks, `docker ps` over ssh |
 | **THE BOOTH** | Jax's office (optional, recommended) |
 
 ## First reel of plugins
 
-`tautulli` · `sonarr` · `radarr` · `lidarr` · `prowlarr` · `qbittorrent` · `nzbget` · `overseerr` · `glances` · `ssh` · `jax`
+`tautulli` · `plex` · `sonarr` · `radarr` · `lidarr` · `prowlarr` · `qbittorrent` · `nzbget` · `sabnzbd` · `overseerr` · `glances` · `ssh` · `prometheus` · `uptime-kuma` · `speedtest` · `jax`
 
 Every source can carry **actions** — terminate a stream, approve a request, pause the queue, restart a container. Anything destructive is marked ⚠ and always routes through a curtain-red confirm modal that defaults to *no*.
 

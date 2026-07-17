@@ -17,9 +17,10 @@ use super::StyleExt;
 
 fn kind_colour(kind: &str) -> Color {
     match kind {
-        "tautulli" => ACCENT2,
+        "tautulli" | "plex" => ACCENT2,
         "sonarr" | "radarr" | "lidarr" | "prowlarr" => INFO,
-        "qbittorrent" | "nzbget" => GOOD,
+        "qbittorrent" | "nzbget" | "sabnzbd" => GOOD,
+        "prometheus" | "uptime-kuma" | "speedtest" => INFO,
         "overseerr" => WARN,
         "jax" => ACCENT2,
         _ => ACCENT,

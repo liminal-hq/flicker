@@ -17,11 +17,18 @@ pub fn screens() -> Vec<(String, Vec<DemoSlot>)> {
     vec![
         (
             "NOW SHOWING".into(),
-            vec![DemoSlot {
-                kind: "tautulli",
-                name: "plex",
-                panel: tautulli(),
-            }],
+            vec![
+                DemoSlot {
+                    kind: "tautulli",
+                    name: "tautulli",
+                    panel: tautulli(),
+                },
+                DemoSlot {
+                    kind: "plex",
+                    name: "plex direct",
+                    panel: plex(),
+                },
+            ],
         ),
         (
             "COMING SOON".into(),
@@ -60,6 +67,31 @@ pub fn screens() -> Vec<(String, Vec<DemoSlot>)> {
                     kind: "nzbget",
                     name: "nzbget",
                     panel: nzbget(),
+                },
+                DemoSlot {
+                    kind: "sabnzbd",
+                    name: "sabnzbd",
+                    panel: sabnzbd(),
+                },
+            ],
+        ),
+        (
+            "SIGNALS".into(),
+            vec![
+                DemoSlot {
+                    kind: "prometheus",
+                    name: "prometheus",
+                    panel: prometheus(),
+                },
+                DemoSlot {
+                    kind: "uptime-kuma",
+                    name: "uptime kuma",
+                    panel: uptime_kuma(),
+                },
+                DemoSlot {
+                    kind: "speedtest",
+                    name: "speedtest",
+                    panel: speedtest(),
                 },
             ],
         ),
@@ -436,6 +468,123 @@ fn jax() -> Panel {
     }
 }
 
+fn plex() -> Panel {
+    Panel {
+        badge: Some("1 session".into()),
+        rows: vec![stream(
+            "scott",
+            "The Between (2026) · director's cut",
+            0.31,
+            "direct play",
+            22.1,
+            "Plex for LG",
+        )],
+        ..Default::default()
+    }
+}
+
+fn sabnzbd() -> Panel {
+    Panel {
+        badge: Some("4.2 MB/s · 6.1 GB left".into()),
+        rows: vec![
+            queue_row(
+                "FlickerFusion.2024.1080p",
+                0.66,
+                "downloading",
+                Tone::Good,
+                "9m",
+            ),
+            queue_row("TheBooth.S01.Complete", 0.0, "queued", Tone::Muted, "—"),
+        ],
+        footer: Some("337 GB free on download disk".into()),
+        panel_actions: vec![
+            action("pause_all", "pause the whole queue", true),
+            action("resume_all", "resume the queue", false),
+        ],
+        ..Default::default()
+    }
+}
+
+fn prometheus() -> Panel {
+    let row = |icon: &str, itone: Tone, a: &str, b: &str, c: &str, ctone: Tone| RowItem {
+        key: String::new(),
+        cells: vec![
+            cell(icon, itone),
+            cell(a, Tone::Default),
+            cell(b, Tone::Muted),
+            cell(c, ctone),
+        ],
+        actions: vec![],
+    };
+    Panel {
+        badge: Some("11/12 targets up".into()),
+        rows: vec![
+            row(
+                "○",
+                Tone::Bad,
+                "exportarr",
+                "192.168.1.221:9709",
+                "down",
+                Tone::Bad,
+            ),
+            row("·", Tone::Info, "load1", "", "1.1700", Tone::Info),
+        ],
+        ..Default::default()
+    }
+}
+
+fn uptime_kuma() -> Panel {
+    let m = |icon: &str, tone: Tone, name: &str, label: &str, note: &str| RowItem {
+        key: String::new(),
+        cells: vec![
+            cell(icon, tone),
+            cell(name, Tone::Default),
+            cell(label, tone),
+            cell(note, Tone::Muted),
+        ],
+        actions: vec![],
+    };
+    Panel {
+        badge: Some("5/6 up".into()),
+        rows: vec![
+            m("○", Tone::Bad, "sonarr", "down", ""),
+            m("●", Tone::Good, "plex", "up", "42 ms"),
+            m("●", Tone::Good, "overseerr", "up", "88 ms"),
+            m("◑", Tone::Info, "modem", "maintenance", ""),
+        ],
+        ..Default::default()
+    }
+}
+
+fn speedtest() -> Panel {
+    let r = |label: &str, dl: &str, ul: &str, ping: &str, tone: Tone| RowItem {
+        key: String::new(),
+        cells: vec![
+            cell(format!("{label:<7}"), Tone::Muted),
+            cell(dl, tone),
+            cell(ul, Tone::Info),
+            cell(ping, Tone::Muted),
+        ],
+        actions: vec![],
+    };
+    Panel {
+        badge: Some("▼ 926 ▲ 50 Mbps".into()),
+        rows: vec![
+            r("latest", "▼ 925.8 Mbps", "▲ 49.5 Mbps", "15 ms", Tone::Good),
+            r(
+                "average",
+                "▼ 902.3 Mbps",
+                "▲ 48.9 Mbps",
+                "16 ms",
+                Tone::Default,
+            ),
+        ],
+        footer: Some("last run 2026-07-16 · Teksavvy".into()),
+        panel_actions: vec![action("run", "run a speedtest now", false)],
+        ..Default::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -443,7 +592,7 @@ mod tests {
     #[test]
     fn demo_reel_covers_the_rooms() {
         let screens = screens();
-        assert_eq!(screens.len(), 4);
+        assert_eq!(screens.len(), 5);
         for (name, slots) in &screens {
             assert!(!name.is_empty());
             assert!(!slots.is_empty(), "screen {name} is an empty theatre");

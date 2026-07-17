@@ -35,6 +35,8 @@ pub struct SourceCfg {
     pub password: Option<String>,
     /// For `ssh` sources: the host to reach (name or IP, ~/.ssh/config applies).
     pub host: Option<String>,
+    /// For `prometheus` sources: extra instant queries as "label|expr".
+    pub queries: Option<Vec<String>>,
     pub interval_secs: Option<u64>,
 }
 
@@ -73,8 +75,9 @@ pub fn load(path: &Path) -> Result<Config> {
 
 pub const EXAMPLE: &str = r#"# flicker — the space between frames
 # Screens are rooms; each holds one or more sources (panels).
-# Available kinds: tautulli, sonarr, radarr, lidarr, prowlarr,
-#                  qbittorrent, nzbget, overseerr, glances, ssh
+# Available kinds: tautulli, plex, sonarr, radarr, lidarr, prowlarr,
+#                  qbittorrent, nzbget, sabnzbd, overseerr, glances, ssh,
+#                  prometheus, uptime-kuma, speedtest, jax
 
 refresh_secs = 15
 
@@ -120,6 +123,23 @@ name = "FREIGHT"
   password = "changeme"
 
 [[screens]]
+name = "SIGNALS"
+
+  [[screens.sources]]
+  kind = "prometheus"
+  url = "http://192.168.1.10:9090"
+  queries = ["load1 | node_load1"]      # optional extra instant queries
+
+  [[screens.sources]]
+  kind = "uptime-kuma"
+  url = "http://192.168.1.10:3001"
+  api_key = "changeme"                  # only if Kuma auth is enabled
+
+  [[screens.sources]]
+  kind = "speedtest"
+  url = "http://192.168.1.10:8765"
+
+[[screens]]
 name = "BACK LOT"
 
   [[screens.sources]]
@@ -159,7 +179,7 @@ mod tests {
     fn example_config_parses() {
         let cfg: Config = toml::from_str(EXAMPLE).expect("EXAMPLE must stay valid");
         assert_eq!(cfg.refresh_secs, Some(15));
-        assert_eq!(cfg.screens.len(), 4);
+        assert_eq!(cfg.screens.len(), 5);
         assert_eq!(cfg.screens[0].name, "NOW SHOWING");
         assert_eq!(cfg.screens[0].sources[0].kind, "tautulli");
     }

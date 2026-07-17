@@ -23,9 +23,14 @@ pub mod glances;
 pub mod jax;
 pub mod nzbget;
 pub mod overseerr;
+pub mod plex;
+pub mod prometheus;
 pub mod qbittorrent;
+pub mod sabnzbd;
+pub mod speedtest;
 pub mod ssh_host;
 pub mod tautulli;
+pub mod uptime_kuma;
 pub mod util;
 
 /// Semantic colour intent. The theme maps these to actual colours.
@@ -168,15 +173,20 @@ pub mod registry {
 
     pub const KINDS: &[&str] = &[
         "tautulli",
+        "plex",
         "sonarr",
         "radarr",
         "lidarr",
         "prowlarr",
         "qbittorrent",
         "nzbget",
+        "sabnzbd",
         "overseerr",
         "glances",
         "ssh",
+        "prometheus",
+        "uptime-kuma",
+        "speedtest",
         "jax",
     ];
 
@@ -190,6 +200,11 @@ pub mod registry {
             "overseerr" => Box::new(overseerr::Overseerr::new(cfg)?),
             "glances" => Box::new(glances::Glances::new(cfg)?),
             "ssh" => Box::new(ssh_host::SshHost::new(cfg)?),
+            "plex" => Box::new(plex::Plex::new(cfg)?),
+            "sabnzbd" => Box::new(sabnzbd::Sabnzbd::new(cfg)?),
+            "speedtest" => Box::new(speedtest::Speedtest::new(cfg)?),
+            "prometheus" => Box::new(prometheus::Prometheus::new(cfg)?),
+            "uptime-kuma" => Box::new(uptime_kuma::UptimeKuma::new(cfg)?),
             "jax" => Box::new(jax::JaxSource::new(cfg)),
             other => anyhow::bail!(
                 "unknown source kind '{other}' (available: {})",
